@@ -5,8 +5,12 @@
     version: 1.0.0
 
   servers:
-    - url: http://localhost:5000
-      description: Development server
+  - url: http://localhost:5000
+    description: Development server
+  - url: https://todo-nodejs-7bwy.onrender.com/api-docs
+    description: Production server
+
+
 
   tags:
     - name: Authentication
