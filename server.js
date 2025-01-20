@@ -3,12 +3,10 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const morgan = require('morgan');
 const connectDB = require('./config/db');
-const todoRoutes = require('./routes/todoRoutes');
-const userRoutes = require('./routes/userRoutes');
+const allRoutes = require('./routes/routeIndex');
 const swaggerUi = require('swagger-ui-express');
 
 const { errorHandler } = require('./middleware/errorMiddleware');
-
 
 // Swagger setup
 const YAML = require('yamljs');
@@ -25,8 +23,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 // API Routes
-app.use('/api/todos', todoRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api', allRoutes); 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Error Handling Middleware

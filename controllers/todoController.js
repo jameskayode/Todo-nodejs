@@ -1,139 +1,92 @@
-const Todo = require('../models/Todo');
+const todoService = require('../services/todoService');
 
-// Create a single todo
+// Create single or multiple todos
 exports.createTodo = async (req, res) => {
   try {
-    const { title, description, priority, dueDate } = req.body;
-    const todo = await Todo.create({ title, description, priority, dueDate });
-    res.status(201).json({ success: true, data: todo });
+    const userId = req.user.id;
+    let result;
+
+    if (Array.isArray(req.body)) {
+      result = await todoService.createMultipleTodos(req.body, userId);
+      res.status(201).json({ todos: result });
+    } else {
+      req.body.user = userId; 
+      result = await todoService.createSingleTodo(req.body);
+      res.status(201).json(result);
+    }
   } catch (error) {
-    console.error('Error creating todo:', error.message);
-    res.status(400).json({ success: false, message: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 
 // Get all todos
 exports.getTodos = async (req, res) => {
   try {
-    const todos = await Todo.find();
-    res.status(200).json({ success: true, data: todos });
-  } catch (error) {
-    console.error('Error fetching todos:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch todos.' });
-  }
-};
-
-// Get a single todo by ID
-exports.getTodoById = async (req, res) => {
-  try {
-    const todo = await Todo.findById(req.params.id);
-    if (!todo) {
-      return res.status(404).json({ success: false, message: 'Todo not found.' });
+    const todos = await todoService.getAllTodos(req.user.id);
+    if (!todos.length) {
+      return res.status(404).json({ message: 'No todos found for this user.' });
     }
-    res.status(200).json({ success: true, data: todo });
+    res.status(200).json(todos);
   } catch (error) {
-    console.error('Error fetching todo:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch todo.' });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Update a todo
-exports.updateTodo = async (req, res) => {
-  try {
-    const { title, description, priority, dueDate } = req.body;
-    const todo = await Todo.findByIdAndUpdate(
-      req.params.id,
-      { title, description, priority, dueDate },
-      { new: true, runValidators: true }
-    );
-    if (!todo) {
-      return res.status(404).json({ success: false, message: 'Todo not found.' });
-    }
-    res.status(200).json({ success: true, data: todo });
-  } catch (error) {
-    console.error('Error updating todo:', error.message);
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
-
-// Delete a todo
-exports.deleteTodo = async (req, res) => {
-  try {
-    const todo = await Todo.findByIdAndDelete(req.params.id);
-    if (!todo) {
-      return res.status(404).json({ success: false, message: 'Todo not found.' });
-    }
-    res.status(200).json({ success: true, message: 'Todo deleted successfully.' });
-  } catch (error) {
-    console.error('Error deleting todo:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to delete todo.' });
-  }
-};
-
-// Create multiple todos
-exports.createTodos = async (req, res) => {
-  try {
-    const todos = await Todo.insertMany(req.body);
-    res.status(201).json({ success: true, data: todos });
-  } catch (error) {
-    console.error('Error creating todos:', error.message);
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+// Search todos by keyword
 exports.searchTodos = async (req, res) => {
   try {
-    const { keyword } = req.query;
-
-    if (!keyword) {
-      return res.status(400).json({ success: false, message: 'Keyword is required.' });
-    }
-
-    // Search todos with case-insensitive matching in title or description
-    const todos = await Todo.find({
-      $or: [
-        { title: { $regex: keyword, $options: 'i' } },
-        { description: { $regex: keyword, $options: 'i' } },
-      ],
-    });
-
-    res.status(200).json({ success: true, data: todos });
+    const keyword = req.query.keyword;
+    const todos = await todoService.searchTodosByKeyword(req.user.id, keyword);
+    res.status(200).json(todos);
   } catch (error) {
-    console.error('Error searching todos:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to search todos.' });
+    res.status(500).json({ message: error.message });
   }
 };
 
 // Get paginated todos
 exports.getPaginatedTodos = async (req, res) => {
   try {
-    const { page = 1, limit = 10, sort = 'createdAt' } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    // Convert query strings to numbers
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-
-    const todos = await Todo.find()
-      .sort({ [sort]: 1 }) // Sort in ascending order; use `-1` for descending
-      .skip((pageNum - 1) * limitNum)
-      .limit(limitNum);
-
-    // Get total count of todos
-    const total = await Todo.countDocuments();
+    const { todos, total } = await todoService.getPaginatedTodos(req.user.id, skip, limit);
 
     res.status(200).json({
-      success: true,
-      data: {
-        todos,
-        pagination: {
-          total,
-          page: pageNum,
-          limit: limitNum,
-          totalPages: Math.ceil(total / limitNum),
-        },
+      todos,
+      pagination: {
+        page,
+        limit,
+        total,
       },
     });
   } catch (error) {
-    console.error('Error fetching paginated todos:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch todos.' });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update a todo by ID
+exports.updateTodo = async (req, res) => {
+  try {
+    const todo = await todoService.updateTodoById(req.params.id, req.body);
+    if (!todo) {
+      return res.status(404).json({ message: 'Todo not found' });
+    }
+    res.status(200).json(todo);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Delete a todo by ID
+exports.deleteTodo = async (req, res) => {
+  try {
+    const todo = await todoService.deleteTodoById(req.params.id);
+    if (!todo) {
+      return res.status(404).json({ message: 'Todo not found' });
+    }
+    res.status(200).json({ message: 'Todo deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
