@@ -1,11 +1,4 @@
-// File: controllers/authController.js
-
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
-
-dotenv.config();
+const userService = require('../services/userService');
 
 // Helper function to handle error responses
 const sendErrorResponse = (res, statusCode, message, error = null) => {
@@ -14,77 +7,35 @@ const sendErrorResponse = (res, statusCode, message, error = null) => {
 
 // Register a new user
 exports.registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
-
-  if (!name || !email || !password) {
-    return sendErrorResponse(res, 400, 'All fields are required');
-  }
-
   try {
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return sendErrorResponse(res, 400, 'User already exists');
-    }
-
-    const hashedPassword = await bcrypt.hash(password.trim(), 10);
-
-    const newUser = new User({
-      name,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-    });
-
-    await newUser.save();
-    res.status(201).json({ message: 'User registered successfully' });
+    const response = await userService.registerUser(req.body);
+    res.status(201).json(response);
   } catch (error) {
-    sendErrorResponse(res, 500, 'Error registering user', error);
+    sendErrorResponse(res, 400, error.message);
   }
 };
 
 // Login user
 exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return sendErrorResponse(res, 400, 'Email and password are required');
-  }
-
   try {
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
-    if (!user) {
-      return sendErrorResponse(res, 401, 'Invalid email or password');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password.trim(), user.password);
-    if (!isPasswordValid) {
-      return sendErrorResponse(res, 401, 'Invalid email or password');
-    }
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '1d',
-    });
-
-    res.status(200).json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      token,
-    });
+    const response = await userService.loginUser(req.body);
+    res.status(200).json(response);
   } catch (error) {
-    sendErrorResponse(res, 500, 'Error logging in', error);
+    sendErrorResponse(res, 401, error.message);
   }
 };
 
 // Get user profile
 exports.getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
-    if (!user) {
-      return sendErrorResponse(res, 404, 'User not found');
-    }
+    // Log req.user for debugging
+    console.log('Authenticated user:', req.user);
 
-    res.status(200).json(user);
+    const response = await userService.getUserProfile(req.user.id);
+    res.status(200).json(response);
   } catch (error) {
-    sendErrorResponse(res, 500, 'Error fetching user profile', error);
+    console.error('Error fetching user profile:', error.message);
+    res.status(404).json({ message: error.message });
   }
 };
+

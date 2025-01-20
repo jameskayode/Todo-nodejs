@@ -1,6 +1,6 @@
 const Joi = require('joi');
 
-// Validate user registration inputs
+// User registration validation
 exports.validateRegister = (req, res, next) => {
   const schema = Joi.object({
     name: Joi.string().min(3).required(),
@@ -12,11 +12,10 @@ exports.validateRegister = (req, res, next) => {
   if (error) {
     return res.status(400).json({ message: error.details[0].message });
   }
-
   next();
 };
 
-// Validate login inputs
+// User login validation
 exports.validateLogin = (req, res, next) => {
   const schema = Joi.object({
     email: Joi.string().email().required(),
@@ -27,37 +26,56 @@ exports.validateLogin = (req, res, next) => {
   if (error) {
     return res.status(400).json({ message: error.details[0].message });
   }
-
   next();
 };
 
-const todoSchema = Joi.object({
-  title: Joi.string().max(100).required(),
-  description: Joi.string().max(500).required(),
-  priority: Joi.string().valid('Low', 'Medium', 'High').required(),
-  dueDate: Joi.date().required(),
+// Todo validation schema for creating a single todo
+const todoCreateSchema = Joi.object({
+  title: Joi.string().max(300).required(),
+  description: Joi.string().max(1000).optional(),
+  priority: Joi.string().valid('Low', 'Medium', 'High').optional(),
+  dueDate: Joi.date().optional(),
+  status: Joi.string().valid('Pending', 'In Progress', 'Completed').optional(),
 });
 
-// Middleware for single todo validation
+// Todo validation schema for updating a todo
+const todoUpdateSchema = Joi.object({
+  title: Joi.string().max(300).optional(),
+  description: Joi.string().max(1000).optional(),
+  priority: Joi.string().valid('Low', 'Medium', 'High').optional(),
+  dueDate: Joi.date().optional(),
+  status: Joi.string().valid('Pending', 'In Progress', 'Completed').optional(),
+});
+
+// Middleware to validate a single todo (for creation)
 exports.validateTodo = (req, res, next) => {
-  const { error } = todoSchema.validate(req.body);
+  const { error } = todoCreateSchema.validate(req.body);
   if (error) {
-    return res.status(400).json({ message: error.details[0].message });
+    return res.status(400).json({ success: false, message: error.details[0].message });
   }
   next();
 };
 
-// Middleware for multiple todos validation
+// Middleware to validate multiple todos (for bulk creation)
 exports.validateTodos = (req, res, next) => {
   if (!Array.isArray(req.body)) {
     return res.status(400).json({ message: 'Request body must be an array of todos.' });
   }
 
   for (let i = 0; i < req.body.length; i++) {
-    const { error } = todoSchema.validate(req.body[i]);
+    const { error } = todoCreateSchema.validate(req.body[i]);
     if (error) {
       return res.status(400).json({ message: `Todo at index ${i} is invalid: ${error.details[0].message}` });
     }
+  }
+  next();
+};
+
+// Middleware to validate todo updates
+exports.validateTodoUpdate = (req, res, next) => {
+  const { error } = todoUpdateSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({ success: false, message: error.details[0].message });
   }
   next();
 };
